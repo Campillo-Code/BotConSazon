@@ -16,11 +16,14 @@ app.post('/webhook', async (req, res) => {
 
   try {
     const respuesta = await handleMensaje(telefono, mensaje);
+    console.log(`[WhatsApp] Respuesta: "${respuesta.substring(0, 80)}..."`);
 
     const twiml = new MessagingResponse();
     twiml.message(respuesta);
 
-    res.type('text/xml').send(twiml.toString());
+    const xml = twiml.toString();
+    console.log(`[WhatsApp] XML generado: ${xml.substring(0, 200)}`);
+    res.type('text/xml').send(xml);
   } catch (e) {
     console.error('[Error]', e);
     const twiml = new MessagingResponse();
