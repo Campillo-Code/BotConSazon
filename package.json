@@ -1,0 +1,16 @@
+{
+  "name": "bot-con-sazon",
+  "version": "1.0.0",
+  "description": "Bot de WhatsApp para Con Sazón",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "twilio": "^5.5.1",
+    "express": "^4.21.0",
+    "mysql2": "^3.11.0",
+    "dotenv": "^16.4.5"
+  }
+}
