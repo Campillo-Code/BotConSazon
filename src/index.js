@@ -1,13 +1,13 @@
 const express = require('express');
-const { MessagingResponse } = require('twilio').twiml;
 const { handleMensaje } = require('./bot/handlers');
 require('dotenv').config();
+const twilio = require('twilio');
 
+const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
-// Webhook de Twilio - recibe mensajes de WhatsApp
 app.post('/webhook', async (req, res) => {
   const telefono = req.body.From || '';
   const mensaje = req.body.Body || '';
@@ -18,27 +18,25 @@ app.post('/webhook', async (req, res) => {
     const respuesta = await handleMensaje(telefono, mensaje);
     console.log(`[WhatsApp] Respuesta: "${respuesta.substring(0, 80)}..."`);
 
-    const twiml = new MessagingResponse();
-    twiml.message(respuesta);
+    await client.messages.create({
+      contentSid: 'HX7cf5a23fe00549e2ed931e272889fb49',
+      from: process.env.TWILIO_WHATSAPP_NUMBER,
+      to: telefono,
+    });
 
-    const xml = twiml.toString();
-    console.log(`[WhatsApp] XML generado: ${xml.substring(0, 200)}`);
-    res.type('text/xml').send(xml);
+    console.log(`[WhatsApp] Mensaje enviado`);
+    res.sendStatus(200);
   } catch (e) {
-    console.error('[Error]', e);
-    const twiml = new MessagingResponse();
-    twiml.message('Lo siento, ha habido un error. Inténtalo de nuevo.');
-    res.type('text/xml').send(twiml.toString());
+    console.error('[Error]', e.message);
+    res.sendStatus(500);
   }
 });
 
-// Endpoint para verificar que el servidor está vivo
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok' });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`[Bot] Servidor escuchando en puerto ${PORT}`);
-  console.log(`[Bot] Webhook: http://localhost:${PORT}/webhook`);
+  console.log(`[Bot] Puerto ${PORT}`);
 });
