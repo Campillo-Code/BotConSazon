@@ -39,35 +39,35 @@ async function handleMensaje(telefono, texto) {
   // Comandos globales
   if (lower === 'menú' || lower === 'menu' || lower === 'ver menu') {
     conv.paso = 'seleccionando_plato';
-    return await getMenuMessage();
+    return { respuesta: await getMenuMessage(), tipo: 'menu' };
   }
 
   if (lower === 'cancelar' || lower === 'volver') {
     if (conv.pedido.length > 0) {
       conv.pedido = [];
       conv.paso = 'inicio';
-      return '❌ Pedido cancelado. Escribe "menu" para empezar de nuevo.';
+      return { respuesta: '❌ Pedido cancelado. Escribe "menu" para empezar de nuevo.', tipo: 'pedido' };
     }
     conv.paso = 'inicio';
-    return 'Escribe "menu" para ver el menú.';
+    return { respuesta: 'Escribe "menu" para ver el menú.', tipo: 'bienvenida' };
   }
 
   if (lower === 'finalizar' || lower === 'confirmar') {
     if (conv.pedido.length === 0) {
-      return 'No tienes nada en el pedido. Escribe "menu" para ver el menú.';
+      return { respuesta: 'No tienes nada en el pedido. Escribe "menu" para ver el menú.', tipo: 'bienvenida' };
     }
-    return await finalizarPedido(telefono, conv);
+    return { respuesta: await finalizarPedido(telefono, conv), tipo: 'pedido' };
   }
 
   if (lower === 'pedir') {
     conv.paso = 'seleccionando_plato';
-    return await getMenuMessage();
+    return { respuesta: await getMenuMessage(), tipo: 'menu' };
   }
 
   // Flujo según paso
   switch (conv.paso) {
     case 'inicio':
-      return '¡Hola! 👋 Bienvenido a *Con Sazón*.\n\nEscribe "menu" para ver nuestra carta y hacer tu pedido.';
+      return { respuesta: '¡Hola! 👋 Bienvenido a *Con Sazón*.\n\nEscribe "menu" para ver nuestra carta y hacer tu pedido.', tipo: 'bienvenida' };
 
     case 'seleccionando_plato': {
       const todosPlatos = await db.getTodosPlatos();
@@ -80,15 +80,15 @@ async function handleMensaje(telefono, texto) {
           conv.paso = 'confirmando_plato';
           let msg = `¿*${parcial.nombre}*? (${parcial.categoria_nombre})\n\n`;
           msg += '1️⃣ Añadir al pedido\n2️⃣ Volver al menú\n\nResponde con 1 o 2.';
-          return msg;
+          return { respuesta: msg, tipo: 'menu' };
         }
-        return `No encontré "${texto}". Escribe "menu" para ver las opciones disponibles.`;
+        return { respuesta: `No encontré "${texto}". Escribe "menu" para ver las opciones disponibles.`, tipo: 'bienvenida' };
       }
       conv.platoSeleccionado = plato;
       conv.paso = 'confirmando_plato';
       let msg2 = `¿*${plato.nombre}*? (${plato.categoria_nombre})\n\n`;
       msg2 += '1️⃣ Añadir al pedido\n2️⃣ Volver al menú\n\nResponde con 1 o 2.';
-      return msg2;
+      return { respuesta: msg2, tipo: 'menu' };
     }
 
     case 'confirmando_plato': {
@@ -115,18 +115,18 @@ async function handleMensaje(telefono, texto) {
         const total = conv.pedido.reduce((s, i) => s + i.precio * i.cantidad, 0);
         msg += `\n💰 *Total: ${total.toFixed(2)} €*\n\n`;
         msg += 'Escribe otro plato, o "finalizar" para confirmar el pedido.';
-        return msg;
+        return { respuesta: msg, tipo: 'pedido' };
       }
       if (lower === '2' || lower === 'volver') {
         conv.paso = 'seleccionando_plato';
-        return await getMenuMessage();
+        return { respuesta: await getMenuMessage(), tipo: 'menu' };
       }
-      return 'Responde con 1 (añadir) o 2 (volver).';
+      return { respuesta: 'Responde con 1 (añadir) o 2 (volver).', tipo: 'menu' };
     }
 
     default:
       conv.paso = 'inicio';
-      return 'Escribe "menu" para ver el menú.';
+      return { respuesta: 'Escribe "menu" para ver el menú.', tipo: 'bienvenida' };
   }
 }
 
@@ -150,7 +150,7 @@ async function finalizarPedido(telefono, conv) {
 
   conv.pedido = [];
   conv.paso = 'inicio';
-  return msg;
+  return { respuesta: msg, tipo: 'pedido' };
 }
 
 module.exports = { handleMensaje };

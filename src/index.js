@@ -1,5 +1,6 @@
 const express = require('express');
 const { handleMensaje } = require('./bot/handlers');
+const TEMPLATES = require('./bot/templates');
 require('dotenv').config();
 const twilio = require('twilio');
 
@@ -15,16 +16,19 @@ app.post('/webhook', async (req, res) => {
   console.log(`[WhatsApp] De: ${telefono} | Mensaje: "${mensaje}"`);
 
   try {
-    const respuesta = await handleMensaje(telefono, mensaje);
-    console.log(`[WhatsApp] Respuesta: "${respuesta.substring(0, 80)}..."`);
+    const { respuesta, tipo } = await handleMensaje(telefono, mensaje);
+    console.log(`[WhatsApp] Tipo: ${tipo} | Respuesta: "${respuesta.substring(0, 80)}..."`);
+
+    // Seleccionar plantilla según el tipo de respuesta
+    const contentSid = TEMPLATES[tipo] || TEMPLATES.bienvenida;
 
     await client.messages.create({
-      contentSid: 'HX7cf5a23fe00549e2ed931e272889fb49',
+      contentSid: contentSid,
       from: process.env.TWILIO_WHATSAPP_NUMBER,
       to: telefono,
     });
 
-    console.log(`[WhatsApp] Mensaje enviado`);
+    console.log(`[WhatsApp] Mensaje enviado con plantilla: ${tipo}`);
     res.sendStatus(200);
   } catch (e) {
     console.error('[Error]', e.message);
