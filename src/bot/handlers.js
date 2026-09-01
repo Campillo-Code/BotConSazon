@@ -150,7 +150,7 @@ async function finalizarPedido(telefono, conv) {
 
   conv.pedido = [];
   conv.paso = 'inicio';
-  return { respuesta: msg, tipo: 'pedido' };
+  return msg;
 }
 
 module.exports = { handleMensaje };
