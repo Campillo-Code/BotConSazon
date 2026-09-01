@@ -20,8 +20,8 @@ async function getMenuMessage() {
   msg += 'Selecciona una categoría:\n\n';
   for (const cat of categorias) {
     const platos = await db.getPlatosPorCategoria(cat.id);
-    msg += `*${cat.nombre}* — ${cat.precio.toFixed(2)} €`;
-    if (cat.plus > 0) msg += ` (+${cat.plus.toFixed(2)} € plus)`;
+    msg += `*${cat.nombre}* — ${Number(cat.precio).toFixed(2)} €`;
+    if (cat.plus > 0) msg += ` (+${Number(cat.plus).toFixed(2)} € plus)`;
     msg += '\n';
     for (const p of platos) {
       msg += `  • ${p.nombre}\n`;
