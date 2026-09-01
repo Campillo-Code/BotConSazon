@@ -97,7 +97,7 @@ async function handleMensaje(telefono, texto) {
         // Buscar precio de la categoría
         const cats = await db.getCategorias();
         const cat = cats.find(c => c.id === plato.categoria_id);
-        const precio = cat ? cat.precio : 0;
+        const precio = cat ? Number(cat.precio) : 0;
 
         conv.pedido.push({
           nombre: plato.nombre,
