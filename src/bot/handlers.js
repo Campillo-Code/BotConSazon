@@ -5,7 +5,7 @@ const conversaciones = new Map();
 
 function getConv(telefono) {
   if (!conversaciones.has(telefono)) {
-    conversaciones.set(telefono, { paso: 'inicio', pedido: [], categoriaActual: null });
+    conversaciones.set(telefono, { paso: 'inicio', pedido: [], tipo: 'pedido', encargoDescripcion: null, encargoFecha: null });
   }
   return conversaciones.get(telefono);
 }
@@ -14,12 +14,13 @@ function resetConv(telefono) {
   conversaciones.delete(telefono);
 }
 
-async function getMenuMessage() {
+async function getMenuMessage(tipo) {
   const categorias = await db.getCategorias();
-  let msg = '🍽️ *Menú de Con Sazón*\n\n';
+  let msg = tipo === 'encargo' ? '📦 *Encargos de Con Sazón*\n\n' : '🍽️ *Menú de Con Sazón*\n\n';
   msg += 'Selecciona una categoría:\n\n';
   for (const cat of categorias) {
-    const platos = await db.getPlatosPorCategoria(cat.id);
+    const platos = await db.getPlatosPorCategoria(cat.id, tipo);
+    if (platos.length === 0) continue;
     msg += `*${cat.nombre}* — ${Number(cat.precio).toFixed(2)} €`;
     if (cat.plus > 0) msg += ` (+${Number(cat.plus).toFixed(2)} € plus)`;
     msg += '\n';
@@ -39,7 +40,15 @@ async function handleMensaje(telefono, texto) {
   // Comandos globales
   if (lower === 'menú' || lower === 'menu' || lower === 'ver menu') {
     conv.paso = 'seleccionando_plato';
-    return { respuesta: await getMenuMessage(), tipo: 'menu' };
+    conv.tipo = 'pedido';
+    return { respuesta: await getMenuMessage('pedido'), tipo: 'menu' };
+  }
+
+  if (lower === 'encargo' || lower === 'hacer encargo') {
+    conv.paso = 'seleccionando_plato';
+    conv.tipo = 'encargo';
+    conv.pedido = [];
+    return { respuesta: await getMenuMessage('encargo'), tipo: 'menu' };
   }
 
   if (lower === 'cancelar' || lower === 'volver') {
@@ -70,7 +79,7 @@ async function handleMensaje(telefono, texto) {
       return { respuesta: '¡Hola! 👋 Bienvenido a *Con Sazón*.\n\nEscribe "menu" para ver nuestra carta y hacer tu pedido.', tipo: 'bienvenida' };
 
     case 'seleccionando_plato': {
-      const todosPlatos = await db.getTodosPlatos();
+      const todosPlatos = await db.getTodosPlatos(conv.tipo);
       const plato = todosPlatos.find(p => p.nombre.toLowerCase() === lower);
       if (!plato) {
         // Buscar coincidencia parcial
@@ -97,7 +106,12 @@ async function handleMensaje(telefono, texto) {
         // Buscar precio de la categoría
         const cats = await db.getCategorias();
         const cat = cats.find(c => c.id === plato.categoria_id);
-        const precio = cat ? Number(cat.precio) : 0;
+        let precio = cat ? Number(cat.precio) : 0;
+
+        // Si es encargo y la receta tiene precio_venta_entero, usar ese precio
+        if (conv.tipo === 'encargo' && plato.precio_venta_entero) {
+          precio = Number(plato.precio_venta_entero);
+        }
 
         conv.pedido.push({
           nombre: plato.nombre,
@@ -105,6 +119,7 @@ async function handleMensaje(telefono, texto) {
           precio,
           cantidad: 1,
         });
+        conv.tipo = conv.tipo || 'pedido';
 
         conv.paso = 'seleccionando_plato';
         let msg = `✅ *${plato.nombre}* añadido (${precio.toFixed(2)} €)\n\n`;
@@ -124,6 +139,47 @@ async function handleMensaje(telefono, texto) {
       return { respuesta: 'Responde con 1 (añadir) o 2 (volver).', tipo: 'menu' };
     }
 
+    case 'encargo_descripcion': {
+      // El cliente describe qué quiere encargar
+      conv.encargoDescripcion = texto;
+      conv.paso = 'encargo_fecha';
+      return { respuesta: `📦 *Tu encargo:*\n${texto}\n\n¿Para qué fecha lo necesitas? (ej: "25 de agosto")`, tipo: 'menu' };
+    }
+
+    case 'encargo_fecha': {
+      conv.encargoFecha = texto;
+      conv.paso = 'encargo_confirmar';
+      let msg = `📦 *Resumen del encargo:*\n\n`;
+      msg += `• Descripción: ${conv.encargoDescripcion}\n`;
+      msg += `• Fecha: ${conv.encargoFecha}\n\n`;
+      msg += '¿Confirmar encargo?\n1️⃣ Sí, confirmar\n2️⃣ Cancelar';
+      return { respuesta: msg, tipo: 'menu' };
+    }
+
+    case 'encargo_confirmar': {
+      if (lower === '1' || lower === 'sí' || lower === 'si' || lower === 'confirmar') {
+        const pedidoId = await db.crearPedido({
+          telefono,
+          nombre: null,
+          items: [{ categoria: 'Encargo', descripcion: conv.encargoDescripcion, cantidad: 1, precio_unitario: 0, subtotal: 0 }],
+          total: 0,
+          notas: `Fecha de entrega: ${conv.encargoFecha}`,
+          tipo: 'encargo',
+        });
+        conv.paso = 'inicio';
+        conv.encargoDescripcion = null;
+        conv.encargoFecha = null;
+        return { respuesta: `✅ *¡Encargo #${pedidoId} registrado!*\n\nTe contactaremos para confirmar disponibilidad y precio.\n\n¡Gracias! 🙏`, tipo: 'pedido' };
+      }
+      if (lower === '2' || lower === 'cancelar') {
+        conv.paso = 'inicio';
+        conv.encargoDescripcion = null;
+        conv.encargoFecha = null;
+        return { respuesta: '❌ Encargo cancelado.', tipo: 'bienvenida' };
+      }
+      return { respuesta: 'Responde 1 (confirmar) o 2 (cancelar).', tipo: 'menu' };
+    }
+
     default:
       conv.paso = 'inicio';
       return { respuesta: 'Escribe "menu" para ver el menú.', tipo: 'bienvenida' };
@@ -139,6 +195,8 @@ async function finalizarPedido(telefono, conv) {
     items: conv.pedido,
     total,
     notas: null,
+    tipo: conv.tipo || 'pedido',
+    fecha_entrega: conv.fecha_entrega || null,
   });
 
   let msg = `✅ *¡Pedido #${pedidoId} confirmado!*\n\n`;

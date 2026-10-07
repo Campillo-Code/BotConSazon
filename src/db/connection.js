@@ -27,28 +27,32 @@ async function getCategorias() {
   return rows;
 }
 
-async function getPlatosPorCategoria(categoriaId) {
+async function getPlatosPorCategoria(categoriaId, tipo) {
   const p = await getPool();
+  const activoFilter = tipo === 'encargo' ? "AND COALESCE(cp.activo_encargo, TRUE) = 1" : "AND COALESCE(cp.activo_pedido, TRUE) = 1";
+  const tipoFilter = tipo === 'encargo' ? "AND (r.tipo_receta = 'encargo' OR r.tipo_receta = 'ambos')" : "AND (r.tipo_receta = 'pedido' OR r.tipo_receta = 'ambos' OR r.tipo_receta IS NULL)";
   const [rows] = await p.execute(
-    'SELECT cp.id, cp.nombre, cp.receta_id FROM caja_platos cp WHERE cp.categoria_id = ? AND cp.activo = 1 ORDER BY cp.nombre',
+    `SELECT cp.id, cp.nombre, cp.receta_id, r.precio_venta_entero FROM caja_platos cp LEFT JOIN recetas r ON cp.receta_id = r.id WHERE cp.categoria_id = ? AND cp.activo = 1 ${activoFilter} ${tipoFilter} ORDER BY cp.nombre`,
     [categoriaId]
   );
   return rows;
 }
 
-async function getTodosPlatos() {
+async function getTodosPlatos(tipo) {
   const p = await getPool();
+  const activoFilter = tipo === 'encargo' ? "AND COALESCE(cp.activo_encargo, TRUE) = 1" : "AND COALESCE(cp.activo_pedido, TRUE) = 1";
+  const tipoFilter = tipo === 'encargo' ? "AND (r.tipo_receta = 'encargo' OR r.tipo_receta = 'ambos')" : "AND (r.tipo_receta = 'pedido' OR r.tipo_receta = 'ambos' OR r.tipo_receta IS NULL)";
   const [rows] = await p.execute(
-    'SELECT cp.id, cp.nombre, cp.categoria_id, c.nombre AS categoria_nombre FROM caja_platos cp INNER JOIN caja_categorias c ON cp.categoria_id = c.id WHERE cp.activo = 1 ORDER BY c.orden, cp.nombre'
+    `SELECT cp.id, cp.nombre, cp.categoria_id, c.nombre AS categoria_nombre, r.precio_venta_entero FROM caja_platos cp INNER JOIN caja_categorias c ON cp.categoria_id = c.id LEFT JOIN recetas r ON cp.receta_id = r.id WHERE cp.activo = 1 ${activoFilter} ${tipoFilter} ORDER BY c.orden, cp.nombre`
   );
   return rows;
 }
 
-async function crearPedido({ telefono, nombre, items, total, notas }) {
+async function crearPedido({ telefono, nombre, items, total, notas, tipo, fecha_entrega }) {
   const p = await getPool();
   const [result] = await p.execute(
-    'INSERT INTO whatsapp_pedidos (telefono, nombre_cliente, items, total, notas, estado) VALUES (?, ?, ?, ?, ?, ?)',
-    [telefono, nombre || null, JSON.stringify(items), total, notas || null, 'pendiente']
+    'INSERT INTO whatsapp_pedidos (telefono, nombre_cliente, items, total, notas, tipo, estado, fecha_entrega) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [telefono, nombre || null, JSON.stringify(items), total, notas || null, tipo || 'pedido', 'pendiente', fecha_entrega || null]
   );
   return result.insertId;
 }
