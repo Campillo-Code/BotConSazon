@@ -1,5 +1,6 @@
 const express = require('express');
 const { handleMensaje } = require('./bot/handlers');
+const db = require('./db/connection');
 require('dotenv').config();
 const twilio = require('twilio');
 
@@ -15,8 +16,14 @@ app.post('/webhook', async (req, res) => {
   console.log(`[WhatsApp] De: ${telefono} | Mensaje: "${mensaje}"`);
 
   try {
+    // Guardar mensaje entrante
+    await db.guardarMensaje(telefono, mensaje, 'in');
+
     const { respuesta } = await handleMensaje(telefono, mensaje);
     console.log(`[WhatsApp] Respuesta: "${respuesta.substring(0, 80)}..."`);
+
+    // Guardar mensaje saliente
+    await db.guardarMensaje(telefono, respuesta, 'out');
 
     // Mensaje libre (sesión) — el cliente siempre escribe primero
     await client.messages.create({

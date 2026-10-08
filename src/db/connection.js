@@ -74,6 +74,34 @@ async function actualizarEstadoPedido(id, estado) {
   );
 }
 
+async function guardarMensaje(telefono, mensaje, direccion) {
+  const p = await getPool();
+  await p.execute(
+    'INSERT INTO whatsapp_messages (telefono, mensaje, direccion) VALUES (?, ?, ?)',
+    [telefono, mensaje, direccion]
+  );
+}
+
+async function getMensajes(telefono, limite) {
+  const p = await getPool();
+  const [rows] = await p.execute(
+    'SELECT id, telefono, mensaje, direccion, DATE_FORMAT(created_at, "%Y-%m-%d %H:%i") AS fecha FROM whatsapp_messages WHERE telefono = ? ORDER BY created_at ASC LIMIT ?',
+    [telefono, limite || 50]
+  );
+  return rows;
+}
+
+async function getConversaciones() {
+  const p = await getPool();
+  const [rows] = await p.execute(
+    `SELECT telefono, MAX(created_at) AS ultima_fecha, COUNT(*) AS total_mensajes
+     FROM whatsapp_messages
+     GROUP BY telefono
+     ORDER BY ultima_fecha DESC`
+  );
+  return rows;
+}
+
 module.exports = {
   getPool,
   getCategorias,
@@ -82,4 +110,7 @@ module.exports = {
   crearPedido,
   getPedido,
   actualizarEstadoPedido,
+  guardarMensaje,
+  getMensajes,
+  getConversaciones,
 };
