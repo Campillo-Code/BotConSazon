@@ -114,10 +114,12 @@ async function handleMensaje(telefono, texto) {
         }
 
         conv.pedido.push({
-          nombre: plato.nombre,
+          descripcion: plato.nombre,
           categoria: cat?.nombre || '',
-          precio,
+          precio_unitario: precio,
+          subtotal: precio,
           cantidad: 1,
+          iva_porcentaje: 10,
         });
         conv.tipo = conv.tipo || 'pedido';
 
@@ -125,9 +127,9 @@ async function handleMensaje(telefono, texto) {
         let msg = `✅ *${plato.nombre}* añadido (${precio.toFixed(2)} €)\n\n`;
         msg += `🛒 *Pedido actual:* ${conv.pedido.length} artículo(s)\n`;
         for (const item of conv.pedido) {
-          msg += `  • ${item.nombre} — ${item.precio.toFixed(2)} €\n`;
+          msg += `  • ${item.descripcion} — ${item.precio_unitario.toFixed(2)} €\n`;
         }
-        const total = conv.pedido.reduce((s, i) => s + i.precio * i.cantidad, 0);
+        const total = conv.pedido.reduce((s, i) => s + i.precio_unitario * i.cantidad, 0);
         msg += `\n💰 *Total: ${total.toFixed(2)} €*\n\n`;
         msg += 'Escribe otro plato, o "finalizar" para confirmar el pedido.';
         return { respuesta: msg, tipo: 'pedido' };
@@ -161,7 +163,7 @@ async function handleMensaje(telefono, texto) {
         const pedidoId = await db.crearPedido({
           telefono,
           nombre: null,
-          items: [{ categoria: 'Encargo', descripcion: conv.encargoDescripcion, cantidad: 1, precio_unitario: 0, subtotal: 0 }],
+          items: [{ categoria: 'Encargo', descripcion: conv.encargoDescripcion, cantidad: 1, precio_unitario: 0, subtotal: 0, iva_porcentaje: 10 }],
           total: 0,
           notas: `Fecha de entrega: ${conv.encargoFecha}`,
           tipo: 'encargo',
@@ -187,7 +189,7 @@ async function handleMensaje(telefono, texto) {
 }
 
 async function finalizarPedido(telefono, conv) {
-  const total = conv.pedido.reduce((s, i) => s + i.precio * i.cantidad, 0);
+  const total = conv.pedido.reduce((s, i) => s + i.precio_unitario * i.cantidad, 0);
 
   const pedidoId = await db.crearPedido({
     telefono,
@@ -201,7 +203,7 @@ async function finalizarPedido(telefono, conv) {
 
   let msg = `✅ *¡Pedido #${pedidoId} confirmado!*\n\n`;
   for (const item of conv.pedido) {
-    msg += `• ${item.nombre} — ${item.precio.toFixed(2)} €\n`;
+    msg += `• ${item.descripcion} — ${item.precio_unitario.toFixed(2)} €\n`;
   }
   msg += `\n💰 *Total: ${total.toFixed(2)} €*\n\n`;
   msg += 'Te confirmaremos cuando esté listo. ¡Gracias! 🙏';

@@ -33,10 +33,29 @@ app.post('/webhook', async (req, res) => {
     });
 
     console.log(`[WhatsApp] Mensaje enviado`);
-    res.sendStatus(200);
+    res.status(200).send('');
   } catch (e) {
     console.error('[Error]', e.message);
-    res.sendStatus(500);
+    res.status(500).send('');
+  }
+});
+
+app.post('/send', async (req, res) => {
+  const { telefono, mensaje } = req.body;
+  if (!telefono || !mensaje) {
+    return res.status(400).json({ error: 'telefono y mensaje requeridos' });
+  }
+  try {
+    await client.messages.create({
+      body: mensaje,
+      from: process.env.TWILIO_WHATSAPP_NUMBER,
+      to: telefono,
+    });
+    await db.guardarMensaje(telefono, mensaje, 'manual_out');
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('[Send Error]', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
